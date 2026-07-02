@@ -18,15 +18,25 @@ function formatBytes(chars) {
   return `~${(chars / 1000).toFixed(1)}k chars`;
 }
 
+const IMAGE_EXT = [".png", ".jpg", ".jpeg", ".webp"];
+
+function fileIcon(fileName = "") {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith(".pdf")) return "📄";
+  if (lower.endsWith(".docx")) return "📘";
+  if (IMAGE_EXT.some((ext) => lower.endsWith(ext))) return "🖼️";
+  return "📝";
+}
+
 const SUBJECT_COLORS = {
-  physics:    "bg-blue-100 text-blue-700",
-  chemistry:  "bg-purple-100 text-purple-700",
-  biology:    "bg-green-100 text-green-700",
-  history:    "bg-amber-100 text-amber-700",
-  math:       "bg-red-100 text-red-700",
-  mathematics:"bg-red-100 text-red-700",
-  english:    "bg-pink-100 text-pink-700",
-  general:    "bg-slate-100 text-slate-600",
+  physics: "bg-blue-100 text-blue-700",
+  chemistry: "bg-purple-100 text-purple-700",
+  biology: "bg-green-100 text-green-700",
+  history: "bg-amber-100 text-amber-700",
+  math: "bg-red-100 text-red-700",
+  mathematics: "bg-red-100 text-red-700",
+  english: "bg-pink-100 text-pink-700",
+  general: "bg-slate-100 text-slate-600",
 };
 
 function subjectColor(subject) {
@@ -35,10 +45,10 @@ function subjectColor(subject) {
 
 export default function DocumentsPage() {
   const navigate = useNavigate();
-  const [docs,      setDocs]      = useState([]);
-  const [loading,   setLoading]   = useState(true);
+  const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
-  const [deleting,  setDeleting]  = useState(null); // docId being deleted
+  const [deleting, setDeleting] = useState(null);
 
   const fetchDocs = useCallback(async () => {
     try {
@@ -74,12 +84,12 @@ export default function DocumentsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto p-6 max-w-5xl">
-      
+
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">My Documents</h1>
           <p className="text-slate-500 text-sm mt-1">
-            Upload PDFs or text files to power quizzes, flashcards, and notebook chats.
+            Upload PDFs, Word docs, or photos to power quizzes, flashcards, and notebook chats.
           </p>
         </div>
         <button
@@ -93,7 +103,7 @@ export default function DocumentsPage() {
         </button>
       </div>
 
-      
+
       {showUpload && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-[fadeIn_0.2s_ease]">
@@ -113,10 +123,10 @@ export default function DocumentsPage() {
         </div>
       )}
 
-     
+
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1,2,3].map((i) => (
+          {[1, 2, 3].map((i) => (
             <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 animate-pulse">
               <div className="h-4 bg-slate-200 rounded w-3/4 mb-3" />
               <div className="h-3 bg-slate-100 rounded w-1/2 mb-2" />
@@ -131,7 +141,7 @@ export default function DocumentsPage() {
           </div>
           <h2 className="text-lg font-bold text-slate-800 mb-2">No documents yet</h2>
           <p className="text-slate-400 text-sm max-w-xs mb-6">
-            Upload your first PDF or text file to start generating quizzes, flashcards, and AI notebook chats.
+            Upload your first PDF, Word doc, or photo to start generating quizzes, flashcards, and AI notebook chats.
           </p>
           <button
             onClick={() => setShowUpload(true)}
@@ -147,12 +157,10 @@ export default function DocumentsPage() {
               key={doc._id}
               className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md hover:border-indigo-200 transition-all group flex flex-col"
             >
-              
+
               <div className="flex items-start gap-3 mb-3">
                 <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-100 transition-colors">
-                  <span className="text-xl">
-                    {doc.fileName?.endsWith(".pdf") ? "📄" : "📝"}
-                  </span>
+                  <span className="text-xl">{fileIcon(doc.fileName)}</span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-bold text-slate-800 truncate leading-tight">{doc.title}</h3>
@@ -160,7 +168,7 @@ export default function DocumentsPage() {
                 </div>
               </div>
 
-              
+
               <div className="flex items-center gap-2 flex-wrap mb-4">
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${subjectColor(doc.subject)}`}>
                   {doc.subject}
@@ -169,11 +177,16 @@ export default function DocumentsPage() {
                 {doc.charCount > 0 && (
                   <span className="text-xs text-slate-400">{formatBytes(doc.charCount)}</span>
                 )}
+                {doc.extractionMethod === "ocr" && (
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-sky-100 text-sky-700" title="Text was read using OCR">
+                    🔍 OCR
+                  </span>
+                )}
               </div>
 
               <p className="text-xs text-slate-400 mb-4">Uploaded {formatDate(doc.createdAt)}</p>
 
-             
+
               <div className="mt-auto grid grid-cols-3 gap-1.5">
                 <button
                   onClick={() => navigate(`/notebook?doc=${doc._id}`)}
@@ -195,7 +208,7 @@ export default function DocumentsPage() {
                 </button>
               </div>
 
-              
+
               <button
                 onClick={() => handleDelete(doc._id, doc.title)}
                 disabled={deleting === doc._id}

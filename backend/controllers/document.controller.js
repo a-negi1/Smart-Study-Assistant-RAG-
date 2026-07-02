@@ -1,27 +1,35 @@
 
 
 import multer from "multer";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
 import { Document, DocumentChunk, NotebookConversation } from "../models/Study.models.js";
+import { extractText } from "../utils/textExtraction.js";
 
+
+const ALLOWED_MIMES = [
+  "application/pdf",
+  "text/plain",
+  "text/markdown",
+  "text/x-markdown",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+];
+const ALLOWED_EXTS = ["txt", "md", "pdf", "docx", "png", "jpg", "jpeg", "webp"];
 
 export const upload = multer({
   storage: multer.memoryStorage(),
-  limits:  { fileSize: 10 * 1024 * 1024 }, // 10 MB max
+  limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter(_req, file, cb) {
-    const allowed = [
-      "application/pdf",
-      "text/plain",
-      "text/markdown",
-      "text/x-markdown",
-    ];
     const ext = file.originalname.split(".").pop().toLowerCase();
-    if (allowed.includes(file.mimetype) || ["txt", "md", "pdf"].includes(ext)) {
+    if (ALLOWED_MIMES.includes(file.mimetype) || ALLOWED_EXTS.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error("Only PDF, TXT, or Markdown files are supported."));
+      const err = new Error(
+        "Only PDF, Word (.docx), TXT, Markdown, or photo (PNG/JPG/WEBP) files are supported."
+      );
+      err.statusCode = 400;
+      cb(err);
     }
   },
 });
@@ -32,12 +40,12 @@ const CHUNK_WORDS = 500;
 function chunkText(text) {
 
   const clean = text.replace(/\r\n/g, "\n").replace(/[ \t]+/g, " ").trim();
-  const words  = clean.split(/\s+/);
+  const words = clean.split(/\s+/);
   const chunks = [];
 
   for (let i = 0; i < words.length; i += CHUNK_WORDS) {
     const slice = words.slice(i, i + CHUNK_WORDS).join(" ");
-    if (slice.trim().length > 20) {   // skip near-empty chunks
+    if (slice.trim().length > 20) {
       chunks.push(slice);
     }
   }
@@ -54,44 +62,46 @@ export const uploadDocument = async (req, res, next) => {
     const { title, subject = "general" } = req.body;
     const { originalname, mimetype, buffer } = req.file;
 
-    
-    let rawText = "";
-    const isPDF = mimetype === "application/pdf" ||
-                  originalname.toLowerCase().endsWith(".pdf");
 
-    if (isPDF) {
-      try {
-        const data = await pdfParse(buffer);
-        rawText    = data.text ?? "";
-      } catch (pdfErr) {
-        return res.status(422).json({
-          error: "Could not extract text from the PDF. Make sure it is not scanned/image-only.",
-        });
-      }
-    } else {
-      rawText = buffer.toString("utf-8");
+    const { text: rawText, method, kind, parseError } = await extractText(buffer, mimetype, originalname);
+
+    if (parseError) {
+      return res.status(422).json({
+        error:
+          kind === "docx"
+            ? "Could not read this Word document. Make sure it's a valid, non-corrupted .docx file (old .doc files aren't supported — re-save as .docx)."
+            : "Could not read this file. Please try a different one.",
+      });
     }
 
     if (!rawText.trim()) {
-      return res.status(422).json({ error: "Uploaded file appears to be empty or unreadable." });
+      return res.status(422).json({
+        error:
+          kind === "pdf"
+            ? "Could not extract any text from this PDF, even with OCR. It may be blank, heavily corrupted, or too low-resolution to read. Try uploading clear photos of the pages instead."
+            : kind === "image"
+              ? "Could not read any text in this image. Try a clearer, well-lit, higher-resolution photo."
+              : "Uploaded file appears to be empty or unreadable.",
+      });
     }
 
-    
+
     const docTitle = (title ?? "").trim() || originalname.replace(/\.[^.]+$/, "");
     const doc = await Document.create({
-      owner:    req.user._id,
-      title:    docTitle,
-      subject:  subject.toLowerCase().trim(),
+      owner: req.user._id,
+      title: docTitle,
+      subject: subject.toLowerCase().trim(),
       fileName: originalname,
       mimeType: mimetype,
       charCount: rawText.length,
+      extractionMethod: method,
     });
 
-    
+
     const textChunks = chunkText(rawText);
-    const chunkDocs  = textChunks.map((text, chunkIndex) => ({
+    const chunkDocs = textChunks.map((text, chunkIndex) => ({
       documentId: doc._id,
-      owner:      req.user._id,
+      owner: req.user._id,
       text,
       chunkIndex,
     }));
@@ -100,19 +110,20 @@ export const uploadDocument = async (req, res, next) => {
       await DocumentChunk.insertMany(chunkDocs, { ordered: false });
     }
 
-    
+
     doc.chunkCount = chunkDocs.length;
     await doc.save();
 
     return res.status(201).json({
-      success:    true,
+      success: true,
       documentId: doc._id,
-      title:      doc.title,
-      subject:    doc.subject,
-      fileName:   doc.fileName,
+      title: doc.title,
+      subject: doc.subject,
+      fileName: doc.fileName,
       chunkCount: doc.chunkCount,
-      charCount:  doc.charCount,
-      createdAt:  doc.createdAt,
+      charCount: doc.charCount,
+      extractionMethod: doc.extractionMethod,
+      createdAt: doc.createdAt,
     });
   } catch (err) {
     next(err);
@@ -140,7 +151,7 @@ export const deleteDocument = async (req, res, next) => {
     const doc = await Document.findOne({ _id: docId, owner: req.user._id });
     if (!doc) return res.status(404).json({ error: "Document not found." });
 
-   
+
     await Promise.all([
       DocumentChunk.deleteMany({ documentId: docId }),
       NotebookConversation.deleteMany({ documentId: docId }),

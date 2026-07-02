@@ -334,7 +334,7 @@ export default function NotebookPage() {
             <div className="flex items-center justify-center h-full">
               <div className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : conversation?.messages?.length === 0 ? (
+          ) : !conversation || conversation.messages.length === 0 ? (
             <EmptyChat docTitle={selectedDoc?.title ?? "this document"} />
           ) : (
             <>

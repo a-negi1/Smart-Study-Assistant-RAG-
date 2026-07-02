@@ -4,8 +4,36 @@ import { useCallback, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { documentAPI } from "../../api/services.js";
 
-const ACCEPTED_TYPES = ["application/pdf", "text/plain", "text/markdown", "text/x-markdown"];
-const ACCEPTED_EXT   = [".pdf", ".txt", ".md"];
+const ACCEPTED_TYPES = [
+  "application/pdf",
+  "text/plain",
+  "text/markdown",
+  "text/x-markdown",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+];
+const ACCEPTED_EXT = [".pdf", ".txt", ".md", ".docx", ".png", ".jpg", ".jpeg", ".webp"];
+const IMAGE_EXT = [".png", ".jpg", ".jpeg", ".webp"];
+const MAX_FILE_MB = 15;
+
+function isImageFile(name = "") {
+  const lower = name.toLowerCase();
+  return IMAGE_EXT.some((ext) => lower.endsWith(ext));
+}
+
+function isPdfFile(name = "") {
+  return name.toLowerCase().endsWith(".pdf");
+}
+
+function fileIcon(name = "") {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".pdf")) return "📄";
+  if (lower.endsWith(".docx")) return "📘";
+  if (isImageFile(lower)) return "🖼️";
+  return "📝";
+}
 
 function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -15,21 +43,21 @@ function formatBytes(bytes) {
 
 export default function FileUpload({ onUploaded }) {
   const inputRef = useRef(null);
-  const [dragging,    setDragging]    = useState(false);
-  const [file,        setFile]        = useState(null);
-  const [title,       setTitle]       = useState("");
-  const [subject,     setSubject]     = useState("");
-  const [uploading,   setUploading]   = useState(false);
-  const [progress,    setProgress]    = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [file, setFile] = useState(null);
+  const [title, setTitle] = useState("");
+  const [subject, setSubject] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const validateFile = (f) => {
     const ext = "." + f.name.split(".").pop().toLowerCase();
     if (!ACCEPTED_TYPES.includes(f.type) && !ACCEPTED_EXT.includes(ext)) {
-      toast.error("Only PDF, TXT or Markdown files are supported.");
+      toast.error("Only PDF, Word (.docx), TXT, Markdown, or photo (PNG/JPG/WEBP) files are supported.");
       return false;
     }
-    if (f.size > 10 * 1024 * 1024) {
-      toast.error("File must be under 10 MB.");
+    if (f.size > MAX_FILE_MB * 1024 * 1024) {
+      toast.error(`File must be under ${MAX_FILE_MB} MB.`);
       return false;
     }
     return true;
@@ -38,7 +66,7 @@ export default function FileUpload({ onUploaded }) {
   const pickFile = (f) => {
     if (!validateFile(f)) return;
     setFile(f);
-   
+
     setTitle(f.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
   };
 
@@ -47,7 +75,7 @@ export default function FileUpload({ onUploaded }) {
     setDragging(false);
     const f = e.dataTransfer.files[0];
     if (f) pickFile(f);
-  
+
   }, []);
 
   const handleUpload = async () => {
@@ -55,8 +83,8 @@ export default function FileUpload({ onUploaded }) {
     if (!title.trim()) { toast.error("Please enter a title for this document."); return; }
 
     const formData = new FormData();
-    formData.append("file",    file);
-    formData.append("title",   title.trim());
+    formData.append("file", file);
+    formData.append("title", title.trim());
     formData.append("subject", subject.trim() || "general");
 
     setUploading(true);
@@ -69,7 +97,11 @@ export default function FileUpload({ onUploaded }) {
       const data = await documentAPI.upload(formData);
       clearInterval(ticker);
       setProgress(100);
-      toast.success(`"${data.title}" uploaded — ${data.chunkCount} chunks created!`);
+      toast.success(
+        data.extractionMethod === "ocr"
+          ? `"${data.title}" uploaded — ${data.chunkCount} chunks (read via OCR) 🔍`
+          : `"${data.title}" uploaded — ${data.chunkCount} chunks created!`
+      );
       setTimeout(() => {
         setFile(null);
         setTitle("");
@@ -86,9 +118,11 @@ export default function FileUpload({ onUploaded }) {
     }
   };
 
+  const showOcrHint = file && (isImageFile(file.name) || isPdfFile(file.name));
+
   return (
     <div className="space-y-4">
-      
+
       <div
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
@@ -107,7 +141,7 @@ export default function FileUpload({ onUploaded }) {
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf,.txt,.md"
+          accept={ACCEPTED_EXT.join(",")}
           className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) pickFile(f); }}
         />
@@ -115,9 +149,7 @@ export default function FileUpload({ onUploaded }) {
         {file ? (
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <span className="text-3xl flex-shrink-0">
-                {file.name.endsWith(".pdf") ? "📄" : "📝"}
-              </span>
+              <span className="text-3xl flex-shrink-0">{fileIcon(file.name)}</span>
               <div className="text-left min-w-0">
                 <p className="text-sm font-semibold text-slate-800 truncate">{file.name}</p>
                 <p className="text-xs text-slate-500">{formatBytes(file.size)}</p>
@@ -142,12 +174,12 @@ export default function FileUpload({ onUploaded }) {
             <p className="text-sm font-medium text-slate-700">
               {dragging ? "Drop your file here" : "Drag & drop or click to upload"}
             </p>
-            <p className="text-xs text-slate-400 mt-1">PDF, TXT, or Markdown — up to 10 MB</p>
+            <p className="text-xs text-slate-400 mt-1">PDF, Word, TXT, Markdown, or photo — up to {MAX_FILE_MB} MB</p>
           </div>
         )}
       </div>
 
-      
+
       {file && (
         <div className="space-y-3">
           <div>
@@ -173,7 +205,19 @@ export default function FileUpload({ onUploaded }) {
             />
           </div>
 
-          
+
+          {showOcrHint && (
+            <p className="text-xs text-sky-700 bg-sky-50 border border-sky-100 rounded-xl px-3 py-2 flex items-start gap-1.5">
+              <span className="flex-shrink-0">🔍</span>
+              <span>
+                {isImageFile(file.name)
+                  ? "This photo will be read with OCR — clear, well-lit text works best."
+                  : "If this PDF turns out to be a scan, we'll automatically read it with OCR — that can take a little longer."}
+              </span>
+            </p>
+          )}
+
+
           {uploading && (
             <div className="rounded-full bg-slate-100 h-1.5 overflow-hidden">
               <div
@@ -191,7 +235,7 @@ export default function FileUpload({ onUploaded }) {
             {uploading ? (
               <>
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Uploading…
+                {showOcrHint ? "Uploading & reading…" : "Uploading…"}
               </>
             ) : (
               <>

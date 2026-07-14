@@ -1,10 +1,9 @@
-
-
-import { Router } from "express";
+﻿import { Router } from "express";
 import { body }   from "express-validator";
 import {
   register,
   login,
+  googleAuth,
   logout,
   refreshToken,
   getMe,
@@ -15,7 +14,6 @@ import { authenticate }          from "../middleware/auth.middleware.js";
 import { validate }              from "../middleware/validate.middleware.js";
 
 const router = Router();
-
 
 const registerValidators = [
   body("name")
@@ -47,11 +45,10 @@ const changePasswordValidators = [
     .withMessage("New password must contain at least one number."),
 ];
 
-
 router.post("/register", registerValidators, validate, register);
 router.post("/login",    loginValidators,    validate, login);
+router.post("/google",   body("credential").notEmpty().withMessage("credential is required."), validate, googleAuth);
 router.post("/refresh",  refreshToken);
-
 
 router.post  ("/logout",          authenticate, logout);
 router.get   ("/me",              authenticate, getMe);

@@ -1,10 +1,6 @@
-
-
-import Groq from "groq-sdk";
-
+﻿import Groq from "groq-sdk";
 
 const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
 
 export async function groqJSON({
   systemPrompt,
@@ -26,7 +22,7 @@ export async function groqJSON({
 
   const rawText = completion.choices[0]?.message?.content ?? "";
 
- 
+
   const cleaned = rawText
     .replace(/```json\s*/gi, "")
     .replace(/```\s*/g, "")
@@ -41,14 +37,8 @@ export async function groqJSON({
   }
 }
 
-
 const LEITNER_INTERVALS = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16 };
 
-/**
- * @param {"Easy"|"Medium"|"Hard"} rating
- * @param {number} currentBox
- * @returns {{ newBox: number, nextReviewDate: Date }}
- */
 export function computeNextReview(rating, currentBox) {
   let newBox;
   switch (rating) {
@@ -63,12 +53,6 @@ export function computeNextReview(rating, currentBox) {
   return { newBox, nextReviewDate };
 }
 
-
-/**
- * @param {import("mongoose").Document} card  — full Mongoose doc (not lean)
- * @param {"Easy"|"Medium"|"Hard"} rating
- * @returns {Promise<import("mongoose").Document>}
- */
 export async function applyFlashcardRating(card, rating) {
   const { newBox, nextReviewDate } = computeNextReview(rating, card.boxNumber);
 
@@ -83,12 +67,6 @@ export async function applyFlashcardRating(card, rating) {
   return card.save();
 }
 
-
-/**
- * @param {Array<{ text: string }>} chunks
- * @param {number} [maxChars=6000]
- * @returns {string}
- */
 export function assembleContext(chunks, maxChars = 6000) {
   let out = "", len = 0;
   for (let i = 0; i < chunks.length; i++) {
@@ -100,16 +78,9 @@ export function assembleContext(chunks, maxChars = 6000) {
   return out.trim() || "No relevant context found.";
 }
 
-
 const IS_PROD = process.env.NODE_ENV === "production";
 const COOKIE_DAYS = parseInt(process.env.JWT_COOKIE_EXPIRES_DAYS ?? "7", 10);
 
-/**
- * 
- * @param {import("express").Response} res
- * @param {string} accessToken
- * @param {string} refreshToken
- */
 export function setAuthCookies(res, accessToken, refreshToken) {
   const cookieOptions = {
     httpOnly: true,
@@ -118,11 +89,75 @@ export function setAuthCookies(res, accessToken, refreshToken) {
     path:     "/",
   };
 
-  res.cookie("accessToken",  accessToken,  { ...cookieOptions, maxAge: 15 * 60 * 1000 });          
-  res.cookie("refreshToken", refreshToken, { ...cookieOptions, maxAge: COOKIE_DAYS * 24 * 3600 * 1000 }); 
+  res.cookie("accessToken",  accessToken,  { ...cookieOptions, maxAge: 15 * 60 * 1000 });
+  res.cookie("refreshToken", refreshToken, { ...cookieOptions, maxAge: COOKIE_DAYS * 24 * 3600 * 1000 });
 }
 
 export function clearAuthCookies(res) {
   res.clearCookie("accessToken",  { path: "/" });
   res.clearCookie("refreshToken", { path: "/" });
+}
+
+const HF_MODEL  = "sentence-transformers/all-MiniLM-L6-v2";
+const HF_API_URL = `https://api-inference.huggingface.co/pipeline/feature-extraction/${HF_MODEL}`;
+
+export async function generateEmbedding(text) {
+  const token = process.env.HF_API_TOKEN;
+  if (!token) {
+    console.warn("[embedding] HF_API_TOKEN not set — skipping embedding generation.");
+    return [];
+  }
+
+  const MAX_RETRIES = 4;
+  const truncated   = text.slice(0, 512);
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(HF_API_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          inputs: truncated,
+          options: { wait_for_model: true },
+        }),
+      });
+
+      if (res.status === 503) {
+
+        const wait = Math.min(2000 * 2 ** (attempt - 1), 30000);
+        console.log(`[embedding] Model loading (attempt ${attempt}/${MAX_RETRIES}), retrying in ${wait}ms…`);
+        await new Promise((r) => setTimeout(r, wait));
+        continue;
+      }
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`HF API ${res.status}: ${errBody}`);
+      }
+
+      const data = await res.json();
+
+
+      const vec = Array.isArray(data[0]) ? data[0] : data;
+
+      if (!Array.isArray(vec) || vec.length !== 384) {
+        throw new Error(`Unexpected embedding shape: ${JSON.stringify(vec).slice(0, 120)}`);
+      }
+
+      return vec;
+    } catch (err) {
+      if (attempt === MAX_RETRIES) {
+        console.error(`[embedding] Failed after ${MAX_RETRIES} attempts:`, err.message);
+        return [];
+      }
+      const wait = 2000 * 2 ** (attempt - 1);
+      console.warn(`[embedding] Attempt ${attempt} failed (${err.message}), retrying in ${wait}ms…`);
+      await new Promise((r) => setTimeout(r, wait));
+    }
+  }
+
+  return [];
 }

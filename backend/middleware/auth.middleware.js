@@ -1,11 +1,9 @@
-
-
-import jwt from "jsonwebtoken";
+﻿import jwt from "jsonwebtoken";
 import { User } from "../models/User.model.js";
 
 export const authenticate = async (req, res, next) => {
   try {
-    
+
     let token =
       req.headers.authorization?.startsWith("Bearer ")
         ? req.headers.authorization.split(" ")[1]
@@ -15,17 +13,17 @@ export const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: "Authentication required. Please log in." });
     }
 
-    
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    
+
     const user = await User.findById(decoded.id).select("_id name email role").lean();
 
     if (!user) {
       return res.status(401).json({ error: "Account no longer exists." });
     }
 
-    req.user = user; 
+    req.user = user;
     next();
   } catch (err) {
     if (err.name === "TokenExpiredError") {
@@ -37,7 +35,6 @@ export const authenticate = async (req, res, next) => {
     next(err);
   }
 };
-
 
 export const requireRole = (...roles) =>
   (req, res, next) => {

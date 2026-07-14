@@ -1,8 +1,5 @@
-
-
-import mongoose from "mongoose";
+﻿import mongoose from "mongoose";
 const { Schema, model, Types } = mongoose;
-
 
 const FlashcardSchema = new Schema(
   {
@@ -45,7 +42,6 @@ FlashcardSchema.index({ deck: 1, boxNumber: 1 });
 
 export const Flashcard = model("Flashcard", FlashcardSchema);
 
-
 const FlashcardDeckSchema = new Schema(
   {
     owner: { type: Types.ObjectId, ref: "User", required: true, index: true },
@@ -79,7 +75,6 @@ FlashcardDeckSchema.statics.syncCardCount = async function (deckId) {
 
 export const FlashcardDeck = model("FlashcardDeck", FlashcardDeckSchema);
 
-
 const QuizQuestionSchema = new Schema(
   {
     questionText: { type: String, required: true, trim: true },
@@ -99,7 +94,6 @@ const QuizQuestionSchema = new Schema(
   },
   { _id: true }
 );
-
 
 const QuizSchema = new Schema(
   {
@@ -124,7 +118,6 @@ QuizSchema.pre("save", function (next) {
 });
 
 export const Quiz = model("Quiz", QuizSchema);
-
 
 const AttemptAnswerSchema = new Schema(
   {
@@ -171,7 +164,6 @@ QuizAttemptSchema.index({ student: 1, submittedAt: -1 });
 QuizAttemptSchema.index({ student: 1, subject: 1, submittedAt: -1 });
 
 export const QuizAttempt = model("QuizAttempt", QuizAttemptSchema);
-
 
 const SubjectScoreSchema = new Schema(
   {
@@ -235,7 +227,6 @@ AnalyticsSchema.statics.recordAttempt = async function ({
 
 export const Analytics = model("Analytics", AnalyticsSchema);
 
-
 const DocumentSchema = new Schema(
   {
     owner: { type: Types.ObjectId, ref: "User", required: true, index: true },
@@ -254,20 +245,19 @@ const DocumentSchema = new Schema(
 DocumentSchema.index({ owner: 1, createdAt: -1 });
 export const Document = model("Document", DocumentSchema);
 
-
 const DocumentChunkSchema = new Schema(
   {
     documentId: { type: Types.ObjectId, ref: "Document", required: true, index: true },
     owner: { type: Types.ObjectId, ref: "User", required: true, index: true },
     text: { type: String, required: true },
     chunkIndex: { type: Number, required: true, min: 0 },
+    embedding: { type: [Number], default: [] },
   },
   { timestamps: false }
 );
 
 DocumentChunkSchema.index({ documentId: 1, chunkIndex: 1 });
 export const DocumentChunk = model("DocumentChunk", DocumentChunkSchema);
-
 
 const NotebookMessageSchema = new Schema(
   {

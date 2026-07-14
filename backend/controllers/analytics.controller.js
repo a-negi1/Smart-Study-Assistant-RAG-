@@ -1,7 +1,4 @@
-
-
-import { QuizAttempt, Flashcard, FlashcardDeck } from "../models/Study.models.js";
-
+﻿import { QuizAttempt, Flashcard, FlashcardDeck } from "../models/Study.models.js";
 
 const titleCase = (str = "") =>
   str.split(/[\s_-]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
@@ -22,7 +19,6 @@ function computeStreak(sortedDates) {
   return streak;
 }
 
-
 export const getProgress = async (req, res, next) => {
   try {
     const days          = Math.min(parseInt(req.query.days ?? "30", 10), 90);
@@ -35,7 +31,7 @@ export const getProgress = async (req, res, next) => {
 
     const attempts = await QuizAttempt.find(matchFilter).sort({ submittedAt: 1 }).lean();
 
-    
+
     const dailyMap = new Map();
     for (const a of attempts) {
       const key = a.submittedAt.toISOString().split("T")[0];
@@ -69,7 +65,7 @@ export const getProgress = async (req, res, next) => {
       }
     }
 
-    
+
     const subjectAgg = await QuizAttempt.aggregate([
       { $match: { student: req.user._id, submittedAt: { $gte: since } } },
       {
@@ -89,7 +85,7 @@ export const getProgress = async (req, res, next) => {
       fullMark:  100,
     }));
 
-   
+
     const diffAgg = await QuizAttempt.aggregate([
       { $match: { student: req.user._id, submittedAt: { $gte: since } } },
       {
@@ -115,7 +111,6 @@ export const getProgress = async (req, res, next) => {
     next(err);
   }
 };
-
 
 export const getSummary = async (req, res, next) => {
   try {
@@ -181,7 +176,6 @@ export const getSummary = async (req, res, next) => {
     next(err);
   }
 };
-
 
 export const getHeatmap = async (req, res, next) => {
   try {

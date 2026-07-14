@@ -1,16 +1,13 @@
-
-
-import axios from "axios";
+﻿import axios from "axios";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "/api";
 
 export const apiClient = axios.create({
   baseURL:         BASE_URL,
-  withCredentials: true,            
+  withCredentials: true,
   headers: { "Content-Type": "application/json" },
   timeout: 15000,
 });
-
 
 apiClient.interceptors.request.use(
   (config) => {
@@ -22,7 +19,6 @@ apiClient.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
-
 
 let isRefreshing  = false;
 let failedQueue   = [];
@@ -45,7 +41,7 @@ apiClient.interceptors.response.use(
       !originalRequest.url.includes("/auth/refresh")
     ) {
       if (isRefreshing) {
-        
+
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         }).then((token) => {
@@ -68,7 +64,7 @@ apiClient.interceptors.response.use(
       } catch (refreshErr) {
         processQueue(refreshErr, null);
         localStorage.removeItem("accessToken");
-        window.location.href = "/login"; 
+        window.location.href = "/login";
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;

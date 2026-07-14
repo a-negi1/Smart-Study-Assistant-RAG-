@@ -1,9 +1,6 @@
-
-
-import mongoose from "mongoose";
+﻿import mongoose from "mongoose";
 import { Flashcard, FlashcardDeck } from "../models/Study.models.js";
 import { groqJSON, applyFlashcardRating } from "../utils/index.js";
-
 
 const FLASHCARD_SYSTEM_PROMPT = `
 You are a senior academic tutor who distils complex study material into concise, exam-focused flashcards.
@@ -31,7 +28,6 @@ QUALITY RULES:
 - No two cards should test the same concept from the same angle.
 `.trim();
 
-
 export const generateDeck = async (req, res, next) => {
   try {
     const { text, deckTitle = "New Deck", subject = "general", documentId = null } = req.body;
@@ -41,7 +37,7 @@ export const generateDeck = async (req, res, next) => {
     let docTitle   = deckTitle;
 
     if (documentId) {
-      
+
       if (!mongoose.isValidObjectId(documentId)) {
         return res.status(400).json({ error: "Invalid documentId." });
       }
@@ -67,7 +63,7 @@ export const generateDeck = async (req, res, next) => {
         return res.status(404).json({ error: "No text found for this document. Please re-upload." });
       }
     } else {
-      
+
       if (!text || typeof text !== "string" || text.trim().length < 100) {
         return res.status(400).json({ error: "Provide at least 100 characters of study material." });
       }
@@ -81,7 +77,7 @@ export const generateDeck = async (req, res, next) => {
       maxTokens:    3000,
     });
 
-    
+
     if (
       !Array.isArray(parsed?.flashcards) ||
       parsed.flashcards.length < 1 ||
@@ -90,7 +86,7 @@ export const generateDeck = async (req, res, next) => {
       return res.status(502).json({ error: "AI returned an invalid flashcard structure. Please retry." });
     }
 
-   
+
     const deck = await FlashcardDeck.create({
       owner:            req.user._id,
       title:            docTitle,
@@ -99,7 +95,7 @@ export const generateDeck = async (req, res, next) => {
       cardCount:        parsed.flashcards.length,
     });
 
-    
+
     const cardDocs = await Flashcard.insertMany(
       parsed.flashcards.map((c) => ({
         deck:             deck._id,
@@ -133,8 +129,6 @@ export const generateDeck = async (req, res, next) => {
   }
 };
 
-
-
 export const reviewCard = async (req, res, next) => {
   try {
     const { id }     = req.params;
@@ -147,7 +141,7 @@ export const reviewCard = async (req, res, next) => {
       return res.status(400).json({ error: "rating must be Easy | Medium | Hard." });
     }
 
-   
+
     const card = await Flashcard.findById(id).populate("deck", "owner");
     if (!card) return res.status(404).json({ error: "Flashcard not found." });
 
@@ -168,7 +162,6 @@ export const reviewCard = async (req, res, next) => {
     next(err);
   }
 };
-
 
 export const getDueCards = async (req, res, next) => {
   try {
@@ -197,7 +190,6 @@ export const getDueCards = async (req, res, next) => {
   }
 };
 
-
 export const listDecks = async (req, res, next) => {
   try {
     const decks = await FlashcardDeck.find({ owner: req.user._id, isArchived: false })
@@ -220,7 +212,6 @@ export const listDecks = async (req, res, next) => {
     next(err);
   }
 };
-
 
 export const getDeckCards = async (req, res, next) => {
   try {

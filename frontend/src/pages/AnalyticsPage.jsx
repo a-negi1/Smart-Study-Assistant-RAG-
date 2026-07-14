@@ -1,5 +1,4 @@
-
-import AnalyticsDashboard from "../components/analytics/AnalyticsDashboard.jsx";
+﻿import AnalyticsDashboard from "../components/analytics/AnalyticsDashboard.jsx";
 
 export default function AnalyticsPage() {
   return <AnalyticsDashboard />;

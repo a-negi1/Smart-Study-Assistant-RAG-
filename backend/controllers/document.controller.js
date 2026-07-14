@@ -1,16 +1,14 @@
-
-
 import multer from "multer";
 import { Document, DocumentChunk, NotebookConversation } from "../models/Study.models.js";
 import { extractText } from "../utils/textExtraction.js";
-
+import { generateEmbedding } from "../utils/index.js";
 
 const ALLOWED_MIMES = [
   "application/pdf",
   "text/plain",
   "text/markdown",
   "text/x-markdown",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "image/png",
   "image/jpeg",
   "image/webp",
@@ -34,7 +32,6 @@ export const upload = multer({
   },
 });
 
-
 const CHUNK_WORDS = 500;
 
 function chunkText(text) {
@@ -52,7 +49,6 @@ function chunkText(text) {
   return chunks;
 }
 
-
 export const uploadDocument = async (req, res, next) => {
   try {
     if (!req.file) {
@@ -61,7 +57,6 @@ export const uploadDocument = async (req, res, next) => {
 
     const { title, subject = "general" } = req.body;
     const { originalname, mimetype, buffer } = req.file;
-
 
     const { text: rawText, method, kind, parseError } = await extractText(buffer, mimetype, originalname);
 
@@ -85,7 +80,6 @@ export const uploadDocument = async (req, res, next) => {
       });
     }
 
-
     const docTitle = (title ?? "").trim() || originalname.replace(/\.[^.]+$/, "");
     const doc = await Document.create({
       owner: req.user._id,
@@ -97,19 +91,33 @@ export const uploadDocument = async (req, res, next) => {
       extractionMethod: method,
     });
 
-
     const textChunks = chunkText(rawText);
+
+
+    const CONCURRENCY = 3;
+    const embeddings = new Array(textChunks.length).fill([]);
+
+    for (let i = 0; i < textChunks.length; i += CONCURRENCY) {
+      const batch = textChunks.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(
+        batch.map((chunk) => generateEmbedding(chunk))
+      );
+      results.forEach((vec, j) => {
+        embeddings[i + j] = vec;
+      });
+    }
+
     const chunkDocs = textChunks.map((text, chunkIndex) => ({
       documentId: doc._id,
       owner: req.user._id,
       text,
       chunkIndex,
+      embedding: embeddings[chunkIndex],
     }));
 
     if (chunkDocs.length) {
       await DocumentChunk.insertMany(chunkDocs, { ordered: false });
     }
-
 
     doc.chunkCount = chunkDocs.length;
     await doc.save();
@@ -130,7 +138,6 @@ export const uploadDocument = async (req, res, next) => {
   }
 };
 
-
 export const listDocuments = async (req, res, next) => {
   try {
     const docs = await Document.find({ owner: req.user._id })
@@ -143,14 +150,12 @@ export const listDocuments = async (req, res, next) => {
   }
 };
 
-
 export const deleteDocument = async (req, res, next) => {
   try {
     const { docId } = req.params;
 
     const doc = await Document.findOne({ _id: docId, owner: req.user._id });
     if (!doc) return res.status(404).json({ error: "Document not found." });
-
 
     await Promise.all([
       DocumentChunk.deleteMany({ documentId: docId }),

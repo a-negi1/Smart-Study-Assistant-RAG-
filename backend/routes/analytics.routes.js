@@ -1,5 +1,4 @@
-
-import { Router } from "express";
+﻿import { Router } from "express";
 import { getProgress, getSummary, getHeatmap } from "../controllers/analytics.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 

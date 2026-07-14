@@ -1,6 +1,4 @@
-
-
-import mongoose from "mongoose";
+﻿import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -25,13 +23,18 @@ const UserSchema = new Schema(
     },
     password: {
       type: String,
-      required: [true, "Password is required."],
+
       minlength: [8, "Password must be at least 8 characters."],
-      select: false, 
+      select: false,
+    },
+    googleId: {
+      type: String,
+      default: null,
+      select: false,
     },
     avatar: {
       type: String,
-      default: null, 
+      default: null,
     },
     role: {
       type: String,
@@ -42,15 +45,12 @@ const UserSchema = new Schema(
       type: Boolean,
       default: false,
     },
-    
+
     passwordResetToken:   { type: String, select: false },
     passwordResetExpires: { type: Date,   select: false },
 
-    
-    
     refreshToken: { type: String, select: false },
 
-   
     subjects: [{ type: String, trim: true, lowercase: true }],
     studyGoalMinutesPerDay: { type: Number, default: 30, min: 5, max: 480 },
 
@@ -61,8 +61,8 @@ const UserSchema = new Schema(
     toJSON: {
       virtuals: true,
       transform(_doc, ret) {
-        
         delete ret.password;
+        delete ret.googleId;
         delete ret.refreshToken;
         delete ret.passwordResetToken;
         delete ret.passwordResetExpires;
@@ -74,22 +74,17 @@ const UserSchema = new Schema(
   }
 );
 
-
-
-
-
 UserSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+  if (!this.isModified("password") || !this.password) return next();
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });
 
-
 UserSchema.methods.comparePassword = async function (candidatePassword) {
+  if (!this.password) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
-
 
 UserSchema.methods.generateAccessToken = function () {
   return jwt.sign(
@@ -98,7 +93,6 @@ UserSchema.methods.generateAccessToken = function () {
     { expiresIn: process.env.JWT_EXPIRES_IN ?? "15m" }
   );
 };
-
 
 UserSchema.methods.generateRefreshToken = function () {
   return jwt.sign(

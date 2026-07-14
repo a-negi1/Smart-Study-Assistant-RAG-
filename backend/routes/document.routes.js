@@ -1,6 +1,4 @@
-
-
-import { Router } from "express";
+﻿import { Router } from "express";
 import { authenticate } from "../middleware/auth.middleware.js";
 import {
   upload,
@@ -11,12 +9,11 @@ import {
 
 const router = Router();
 
-
 router.use(authenticate);
 
 router.post(
   "/upload",
-  upload.single("file"),   
+  upload.single("file"),
   uploadDocument
 );
 

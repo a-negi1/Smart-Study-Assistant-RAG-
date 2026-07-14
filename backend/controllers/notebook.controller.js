@@ -1,11 +1,9 @@
-
-import mongoose from "mongoose";
+﻿import mongoose from "mongoose";
 import { NotebookConversation, Document, DocumentChunk } from "../models/Study.models.js";
-import { groqJSON } from "../utils/index.js";
+import { groqJSON, generateEmbedding } from "../utils/index.js";
 import Groq from "groq-sdk";
 
 const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
 
 function buildNotebookSystemPrompt(docTitle, docSubject, contextText) {
   return `
@@ -26,27 +24,53 @@ RULES:
 `.trim();
 }
 
-
 async function retrieveChunks(documentId, query) {
   let chunks = [];
 
+
   try {
-    chunks = await DocumentChunk.aggregate([
-      {
-        $search: {
-          index: "default",
-          compound: {
-            must: [{ text: { query, path: "text" } }],
-            filter: [{ equals: { path: "documentId", value: new mongoose.Types.ObjectId(documentId) } }],
+    const queryEmbedding = await generateEmbedding(query);
+
+    if (queryEmbedding.length === 384) {
+      chunks = await DocumentChunk.aggregate([
+        {
+          $vectorSearch: {
+            index: "vector_index",
+            path: "embedding",
+            queryVector: queryEmbedding,
+            numCandidates: 20,
+            limit: 6,
+            filter: { documentId: new mongoose.Types.ObjectId(documentId) },
           },
         },
-      },
-      { $limit: 6 },
-      { $project: { text: 1, _id: 0 } },
-    ]);
-  } catch (_searchErr) {
-    
+        { $project: { text: 1, score: { $meta: "vectorSearchScore" }, _id: 0 } },
+      ]);
+    }
+  } catch (vecErr) {
+    console.warn("[notebook] Vector search failed, falling back to text search:", vecErr.message);
   }
+
+
+  if (!chunks.length) {
+    try {
+      chunks = await DocumentChunk.aggregate([
+        {
+          $search: {
+            index: "default",
+            compound: {
+              must: [{ text: { query, path: "text" } }],
+              filter: [{ equals: { path: "documentId", value: new mongoose.Types.ObjectId(documentId) } }],
+            },
+          },
+        },
+        { $limit: 6 },
+        { $project: { text: 1, _id: 0 } },
+      ]);
+    } catch (_searchErr) {
+
+    }
+  }
+
 
   if (!chunks.length) {
     chunks = await DocumentChunk.find({ documentId })
@@ -58,7 +82,6 @@ async function retrieveChunks(documentId, query) {
 
   return chunks.map((c) => c.text).join("\n\n---\n\n");
 }
-
 
 export const getConversation = async (req, res, next) => {
   try {
@@ -97,7 +120,6 @@ export const getConversation = async (req, res, next) => {
   }
 };
 
-
 export const chat = async (req, res, next) => {
   try {
     const { docId }  = req.params;
@@ -110,15 +132,15 @@ export const chat = async (req, res, next) => {
       return res.status(400).json({ error: "message is required." });
     }
 
-    const userMessage = message.trim().slice(0, 2000); // cap input
+    const userMessage = message.trim().slice(0, 2000);
 
     const doc = await Document.findOne({ _id: docId, owner: req.user._id }).lean();
     if (!doc) return res.status(404).json({ error: "Document not found." });
 
-    
+
     const contextText = await retrieveChunks(docId, userMessage);
 
-    
+
     let conv = await NotebookConversation.findOne({
       owner:      req.user._id,
       documentId: docId,
@@ -131,10 +153,10 @@ export const chat = async (req, res, next) => {
       });
     }
 
-    
+
     conv.messages.push({ role: "user", content: userMessage });
 
-  
+
     const systemPrompt = buildNotebookSystemPrompt(doc.title, doc.subject, contextText);
     const historyTurns = conv.messages.slice(-20).map((m) => ({
       role:    m.role,
@@ -154,7 +176,7 @@ export const chat = async (req, res, next) => {
     const aiReply = completion.choices[0]?.message?.content?.trim() ??
       "I'm sorry, I couldn't generate a response. Please try again.";
 
-    
+
     conv.messages.push({ role: "assistant", content: aiReply });
     await conv.save();
 
@@ -167,7 +189,6 @@ export const chat = async (req, res, next) => {
     next(err);
   }
 };
-
 
 export const deleteConversation = async (req, res, next) => {
   try {

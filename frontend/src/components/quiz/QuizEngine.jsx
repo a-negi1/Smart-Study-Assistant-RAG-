@@ -1,21 +1,20 @@
-
-import { useState, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { quizAPI } from "../../api/services.js";
 import toast from "react-hot-toast";
 
-const LABEL_COLORS = {
-  A: "bg-violet-100 text-violet-800 border-violet-200",
-  B: "bg-sky-100 text-sky-800 border-sky-200",
-  C: "bg-amber-100 text-amber-800 border-amber-200",
-  D: "bg-rose-100 text-rose-800 border-rose-200",
+const LABEL_STYLES = {
+  A: { bg: "rgba(201,135,58,0.12)",  border: "rgba(201,135,58,0.28)",  color: "#c9873a" },
+  B: { bg: "rgba(91,143,201,0.12)",  border: "rgba(91,143,201,0.28)",  color: "#5b8fc9" },
+  C: { bg: "rgba(143,170,110,0.12)", border: "rgba(143,170,110,0.28)", color: "#8faa6e" },
+  D: { bg: "rgba(184,92,92,0.12)",   border: "rgba(184,92,92,0.28)",   color: "#b85c5c" },
 };
 
-export default function QuizEngine({ quizId, questions = [], onComplete }) {
+export default function QuizEngine({ quizId, questions = [], onComplete, compact = false }) {
   const [index, setIndex]       = useState(0);
   const [selected, setSelected] = useState(null);
   const [revealed, setRevealed] = useState(false);
   const [answers, setAnswers]   = useState([]);
-  const [phase, setPhase]       = useState("quiz"); // quiz | submitting | results
+  const [phase, setPhase]       = useState("quiz");
   const [results, setResults]   = useState(null);
   const [elapsed, setElapsed]   = useState(0);
   const [startedAt]             = useState(() => new Date().toISOString());
@@ -61,7 +60,7 @@ export default function QuizEngine({ quizId, questions = [], onComplete }) {
       setResults(data);
       setPhase("results");
       onComplete?.(data);
-    } catch (err) {
+    } catch {
       toast.error("Failed to submit quiz. Please try again.");
       setPhase("quiz");
     }
@@ -78,57 +77,99 @@ export default function QuizEngine({ quizId, questions = [], onComplete }) {
     return () => window.removeEventListener("keydown", handler);
   }, [phase, revealed, advance, confirm]);
 
+  const px = compact ? "px-4 py-4" : "max-w-2xl mx-auto px-4 py-8";
+
+
   if (phase === "submitting") {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-20">
-        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-500 font-medium">Calculating your score…</p>
+        <div
+          className="w-10 h-10 border-2 rounded-full animate-spin"
+          style={{ borderColor: "var(--rule-strong)", borderTopColor: "var(--amber)" }}
+        />
+        <p className="text-sm font-mono" style={{ color: "var(--text-3)" }}>
+          Calculating your score…
+        </p>
       </div>
     );
   }
 
-  if (phase === "results") return <QuizResults results={results} />;
+  if (phase === "results") return <QuizResults results={results} compact={compact} />;
   if (!current) return null;
 
   const isCorrect = revealed && selected === current.correctAnswer;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-sm font-medium text-slate-500">
-          Question {index + 1} / {questions.length}
+    <div className={px}>
+      {}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-mono" style={{ color: "var(--text-3)" }}>
+          {index + 1} / {questions.length}
         </span>
-        <span className="font-mono text-sm text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-200">
-          ⏱ {String(Math.floor(elapsed / 60)).padStart(2, "0")}:{String(elapsed % 60).padStart(2, "0")}
+        <span
+          className="font-mono text-xs px-2 py-0.5 rounded-md"
+          style={{
+            color: "var(--text-2)",
+            background: "var(--surface-2)",
+            border: "1px solid var(--rule-strong)",
+          }}
+        >
+          {String(Math.floor(elapsed / 60)).padStart(2, "0")}:{String(elapsed % 60).padStart(2, "0")}
         </span>
       </div>
 
-      
-      <div className="w-full h-1.5 bg-slate-200 rounded-full mb-8 overflow-hidden">
-        <div className="h-full bg-indigo-500 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+      {}
+      <div className="w-full h-0.5 rounded-full mb-5 overflow-hidden" style={{ background: "var(--rule)" }}>
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{
+            width: `${progress}%`,
+            background: "var(--amber)",
+          }}
+        />
       </div>
 
-     
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-4">
+      {}
+      <div
+        className="rounded-xl p-5 mb-4"
+        style={{
+          background: "var(--surface-1)",
+          border: "1px solid var(--rule)",
+          boxShadow: "var(--shadow-sm)",
+        }}
+      >
         {current.topic && (
-          <span className="inline-block text-xs font-semibold uppercase tracking-wider text-indigo-500 bg-indigo-50 px-2.5 py-1 rounded-full mb-4">
+          <span
+            className="inline-block text-xs font-mono font-semibold uppercase tracking-wider px-2 py-0.5 rounded mb-3"
+            style={{
+              color: "var(--amber)",
+              background: "var(--amber-dim)",
+              border: "1px solid rgba(201,135,58,0.22)",
+            }}
+          >
             {current.topic}
           </span>
         )}
-        <h2 className="text-lg font-semibold text-slate-800 leading-relaxed mb-6">
+        <h2 className="text-sm font-semibold leading-relaxed mb-4" style={{ color: "var(--text-1)", fontFamily: "'Lora', serif" }}>
           {current.questionText}
         </h2>
 
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {current.options.map((opt) => {
-            let cls = "border-gray-200 bg-white hover:border-indigo-400 hover:bg-indigo-50";
+            let bg      = "var(--surface-2)";
+            let border  = "var(--rule)";
+            let opacity = 1;
+
             if (revealed) {
-              if (opt.label === current.correctAnswer)                     cls = "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300";
-              else if (opt.label === selected)                             cls = "border-red-400 bg-red-50 ring-2 ring-red-300";
-              else                                                         cls = "border-gray-100 bg-gray-50 opacity-50";
+              if (opt.label === current.correctAnswer) {
+                bg = "var(--green-dim)"; border = "rgba(92,154,116,0.40)";
+              } else if (opt.label === selected) {
+                bg = "var(--red-dim)"; border = "rgba(184,92,92,0.40)";
+              } else {
+                opacity = 0.35;
+              }
             } else if (opt.label === selected) {
-              cls = "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-300";
+              bg = "var(--amber-dim)"; border = "var(--amber-rule)";
             }
 
             return (
@@ -136,80 +177,155 @@ export default function QuizEngine({ quizId, questions = [], onComplete }) {
                 key={opt.label}
                 onClick={() => !revealed && setSelected(opt.label)}
                 disabled={revealed}
-                className={`w-full flex items-center gap-3 p-4 rounded-xl border-2 text-left transition-all duration-150 cursor-pointer disabled:cursor-default ${cls}`}
+                className="w-full flex items-center gap-3 p-3.5 rounded-xl text-left transition-all duration-150 cursor-pointer disabled:cursor-default"
+                style={{ background: bg, border: `1px solid ${border}`, opacity }}
               >
-                <span className={`flex-shrink-0 w-7 h-7 rounded-lg border text-xs font-bold flex items-center justify-center ${LABEL_COLORS[opt.label]}`}>
+                {}
+                <span
+                  className="flex-shrink-0 w-7 h-7 rounded-lg border text-xs font-bold flex items-center justify-center"
+                  style={{
+                    background: LABEL_STYLES[opt.label]?.bg,
+                    border: `1px solid ${LABEL_STYLES[opt.label]?.border}`,
+                    color: LABEL_STYLES[opt.label]?.color,
+                  }}
+                >
                   {opt.label}
                 </span>
-                <span className="text-sm text-slate-700 font-medium">{opt.text}</span>
-                {revealed && opt.label === current.correctAnswer && <span className="ml-auto text-emerald-500">✓</span>}
-                {revealed && opt.label === selected && opt.label !== current.correctAnswer && <span className="ml-auto text-red-400">✗</span>}
+                <span className="text-sm" style={{ color: "var(--text-1)" }}>{opt.text}</span>
+                {revealed && opt.label === current.correctAnswer && (
+                  <span className="ml-auto font-mono text-xs" style={{ color: "var(--green-text)" }}>✓</span>
+                )}
+                {revealed && opt.label === selected && opt.label !== current.correctAnswer && (
+                  <span className="ml-auto font-mono text-xs" style={{ color: "var(--red-text)" }}>✗</span>
+                )}
               </button>
             );
           })}
         </div>
       </div>
 
-    
+      {}
       {revealed && (
-        <div className={`rounded-xl p-4 mb-4 border-l-4 text-sm leading-relaxed ${isCorrect ? "bg-emerald-50 border-emerald-400 text-emerald-800" : "bg-red-50 border-red-400 text-red-800"}`}>
-          <span className="font-semibold">{isCorrect ? "✓ Correct! " : "✗ Not quite. "}</span>
-          {current.explanation}
+        <div
+          className="rounded-lg p-3.5 mb-4 text-sm leading-relaxed border-l-2"
+          style={{
+            background: isCorrect ? "var(--green-dim)" : "var(--red-dim)",
+            borderLeftColor: isCorrect ? "var(--green)" : "var(--red)",
+            color: isCorrect ? "var(--green-text)" : "var(--red-text)",
+          }}
+        >
+          <span className="font-semibold font-mono text-xs">{isCorrect ? "CORRECT  " : "INCORRECT  "}</span>
+          <span style={{ color: "var(--text-2)" }}>{current.explanation}</span>
         </div>
       )}
 
-     
+      {}
       <div className="flex justify-end gap-3">
         {!revealed ? (
           <button
             onClick={confirm}
             disabled={!selected}
-            className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 rounded-xl btn-glow text-sm disabled:opacity-40"
           >
             Check Answer
           </button>
         ) : (
           <button
             onClick={advance}
-            className="px-6 py-3 bg-slate-800 text-white font-semibold rounded-xl hover:bg-slate-900 active:scale-95 transition-all"
+            className="px-5 py-2 rounded-lg text-sm font-medium transition-all btn-ghost"
           >
             {index + 1 < questions.length ? "Next →" : "See Results"}
           </button>
         )}
       </div>
-      <p className="text-center text-xs text-slate-400 mt-4">Press A/B/C/D to select · Enter to confirm</p>
+      {!compact && (
+        <p className="text-center text-xs mt-4 font-mono" style={{ color: "var(--text-3)" }}>
+          A / B / C / D to select · Enter to confirm
+        </p>
+      )}
     </div>
   );
 }
 
-function QuizResults({ results }) {
+function QuizResults({ results, compact }) {
   const { score, totalQuestions, percentageScore, passed, breakdown = [] } = results ?? {};
-  const gradeColor = percentageScore >= 80 ? "text-emerald-600" : percentageScore >= 60 ? "text-amber-500" : "text-red-500";
+  const px = compact ? "px-4 py-4" : "max-w-2xl mx-auto px-4 py-8";
+
+  const gradeColor = percentageScore >= 80 ? "var(--green-text)" : percentageScore >= 60 ? "var(--amber)" : "var(--red-text)";
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
-      <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
-        <div className={`text-6xl font-black mb-2 ${gradeColor}`}>{percentageScore}%</div>
-        <p className="text-slate-500 text-sm mb-2">{score} / {totalQuestions} correct</p>
-        <span className={`inline-block text-sm font-semibold px-4 py-1.5 rounded-full ${passed ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-          {passed ? "🎉 Passed" : "📚 Keep Studying"}
+    <div className={`${px} space-y-4`}>
+      {}
+      <div
+        className="rounded-xl p-7 text-center"
+        style={{
+          background: "var(--surface-1)",
+          border: "1px solid var(--rule)",
+          boxShadow: "var(--shadow-sm)",
+        }}
+      >
+        <div
+          className="text-4xl font-bold mb-2 font-mono"
+          style={{ color: gradeColor }}
+        >
+          {percentageScore}%
+        </div>
+        <p className="text-sm mb-3 font-mono" style={{ color: "var(--text-3)" }}>
+          {score} / {totalQuestions} correct
+        </p>
+        <span
+          className="inline-block text-xs font-mono font-semibold px-3 py-1 rounded"
+          style={{
+            background: passed ? "var(--green-dim)" : "var(--red-dim)",
+            border: `1px solid ${passed ? "rgba(92,154,116,0.35)" : "rgba(184,92,92,0.35)"}`,
+            color: passed ? "var(--green-text)" : "var(--red-text)",
+          }}
+        >
+          {passed ? "PASSED" : "KEEP STUDYING"}
         </span>
       </div>
 
-      <div className="space-y-3">
+      {}
+      <div className="space-y-2">
         {breakdown.map((item, i) => (
-          <div key={i} className={`bg-white rounded-xl border p-4 ${item.isCorrect ? "border-emerald-200" : "border-red-200"}`}>
+          <div
+            key={i}
+            className="rounded-lg p-3"
+            style={{
+              background: "var(--surface-1)",
+              border: `1px solid ${item.isCorrect ? "rgba(92,154,116,0.22)" : "rgba(184,92,92,0.22)"}`,
+            }}
+          >
             <div className="flex items-start gap-3">
-              <span className="text-lg">{item.isCorrect ? "✅" : "❌"}</span>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-slate-700 mb-1">{item.questionText}</p>
-                <p className="text-xs text-slate-500">
-                  Your answer: <span className={item.isCorrect ? "text-emerald-600 font-semibold" : "text-red-500 font-semibold"}>{item.studentSelectedAnswer ?? "—"}</span>
-                  {!item.isCorrect && <> · Correct: <span className="text-emerald-600 font-semibold">{item.correctAnswer}</span></>}
+              <span className="font-mono text-xs flex-shrink-0 mt-0.5" style={{ color: item.isCorrect ? "var(--green-text)" : "var(--red-text)" }}>{item.isCorrect ? "✓" : "✗"}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm mb-1" style={{ color: "var(--text-1)" }}>{item.questionText}</p>
+                <p className="text-xs font-mono" style={{ color: "var(--text-3)", fontSize: "10px" }}>
+                  Your answer:{" "}
+                  <span
+                    className="font-semibold"
+                    style={{ color: item.isCorrect ? "var(--green-text)" : "var(--red-text)" }}
+                  >
+                    {item.studentSelectedAnswer ?? "—"}
+                  </span>
+                  {!item.isCorrect && (
+                    <>
+                      {" · Correct: "}
+                      <span className="font-semibold" style={{ color: "var(--green-text)" }}>
+                        {item.correctAnswer}
+                      </span>
+                    </>
+                  )}
                 </p>
-                {item.explanation && <p className="text-xs text-slate-400 mt-1 italic">{item.explanation}</p>}
+                {item.explanation && (
+                  <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
+                    {item.explanation}
+                  </p>
+                )}
               </div>
-              <span className="text-xs text-slate-400 flex-shrink-0">{item.timeTaken}s</span>
+              <span className="text-xs font-mono flex-shrink-0" style={{ color: "var(--text-3)", fontSize: "10px" }}>
+                {item.timeTaken}s
+              </span>
             </div>
           </div>
         ))}

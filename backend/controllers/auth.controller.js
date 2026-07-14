@@ -1,9 +1,9 @@
-
-
-import jwt from "jsonwebtoken";
+﻿import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 import { User } from "../models/User.model.js";
 import { setAuthCookies, clearAuthCookies } from "../utils/index.js";
 
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const userPayload = (user) => ({
   _id:     user._id,
@@ -16,24 +16,20 @@ const userPayload = (user) => ({
   createdAt: user.createdAt,
 });
 
-
 export const register = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
-    
     const existing = await User.findOne({ email: email.toLowerCase().trim() }).lean();
     if (existing) {
       return res.status(409).json({ error: "An account with this email already exists." });
     }
 
-    
     const user = await User.create({ name, email, password });
 
     const accessToken  = user.generateAccessToken();
     const refreshToken = user.generateRefreshToken();
 
-    
     user.refreshToken = refreshToken;
     await user.save({ validateBeforeSave: false });
 
@@ -43,25 +39,27 @@ export const register = async (req, res, next) => {
       success: true,
       message: "Account created successfully.",
       user:    userPayload(user),
-      accessToken, 
+      accessToken,
     });
   } catch (err) {
     next(err);
   }
 };
 
-
 export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    
     const user = await User.findOne({ email: email.toLowerCase().trim() }).select(
       "+password +refreshToken"
     );
 
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password." });
+    }
+
+    if (!user.password) {
+      return res.status(401).json({ error: "This account uses Google sign-in. Please sign in with Google." });
     }
 
     const isMatch = await user.comparePassword(password);
@@ -89,10 +87,68 @@ export const login = async (req, res, next) => {
   }
 };
 
+export const googleAuth = async (req, res, next) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ error: "Google credential is required." });
+    }
+
+
+    let ticket;
+    try {
+      ticket = await googleClient.verifyIdToken({
+        idToken:  credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+    } catch {
+      return res.status(401).json({ error: "Invalid Google credential." });
+    }
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+
+    let user = await User.findOne({ $or: [{ googleId }, { email }] }).select("+googleId +refreshToken");
+
+    if (!user) {
+
+      user = await User.create({
+        name,
+        email,
+        googleId,
+        avatar: picture ?? null,
+        isEmailVerified: true,
+      });
+    } else if (!user.googleId) {
+
+      user.googleId = googleId;
+      if (!user.avatar && picture) user.avatar = picture;
+      await user.save({ validateBeforeSave: false });
+    }
+
+    const accessToken  = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    user.refreshToken = refreshToken;
+    user.lastActiveAt = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    setAuthCookies(res, accessToken, refreshToken);
+
+    return res.status(200).json({
+      success: true,
+      message: "Signed in with Google.",
+      user:    userPayload(user),
+      accessToken,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 export const logout = async (req, res, next) => {
   try {
-  
     await User.findByIdAndUpdate(req.user._id, { refreshToken: null });
     clearAuthCookies(res);
 
@@ -102,7 +158,6 @@ export const logout = async (req, res, next) => {
   }
 };
 
-
 export const refreshToken = async (req, res, next) => {
   try {
     const token = req.cookies?.refreshToken ?? req.body?.refreshToken;
@@ -111,7 +166,6 @@ export const refreshToken = async (req, res, next) => {
       return res.status(401).json({ error: "Refresh token not provided." });
     }
 
-    
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET + "_refresh");
@@ -120,14 +174,12 @@ export const refreshToken = async (req, res, next) => {
       return res.status(401).json({ error: "Invalid or expired refresh token. Please log in again." });
     }
 
-    
     const user = await User.findById(decoded.id).select("+refreshToken");
     if (!user || user.refreshToken !== token) {
       clearAuthCookies(res);
       return res.status(401).json({ error: "Refresh token reuse detected. Please log in again." });
     }
 
-  
     const newAccessToken  = user.generateAccessToken();
     const newRefreshToken = user.generateRefreshToken();
 
@@ -145,7 +197,6 @@ export const refreshToken = async (req, res, next) => {
   }
 };
 
-
 export const getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id).lean();
@@ -156,7 +207,6 @@ export const getMe = async (req, res, next) => {
     next(err);
   }
 };
-
 
 export const updateProfile = async (req, res, next) => {
   try {
@@ -178,19 +228,21 @@ export const updateProfile = async (req, res, next) => {
   }
 };
 
-
 export const changePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
     const user = await User.findById(req.user._id).select("+password");
+    if (!user.password) {
+      return res.status(400).json({ error: "Google sign-in accounts cannot set a password here." });
+    }
     const isMatch = await user.comparePassword(currentPassword);
 
     if (!isMatch) {
       return res.status(401).json({ error: "Current password is incorrect." });
     }
 
-    user.password = newPassword; 
+    user.password = newPassword;
     await user.save();
 
     return res.status(200).json({ success: true, message: "Password updated successfully." });

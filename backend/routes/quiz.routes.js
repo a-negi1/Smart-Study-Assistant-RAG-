@@ -1,5 +1,4 @@
-
-import { Router } from "express";
+﻿import { Router } from "express";
 import { body, param } from "express-validator";
 import {
   generateQuiz,
@@ -12,7 +11,7 @@ import { validate }     from "../middleware/validate.middleware.js";
 
 const router = Router();
 
-router.use(authenticate); 
+router.use(authenticate);
 
 router.post(
   "/generate",

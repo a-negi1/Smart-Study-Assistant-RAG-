@@ -1,5 +1,4 @@
-
-import { Router } from "express";
+﻿import { Router } from "express";
 import { body, param } from "express-validator";
 import {
   generateDeck,
@@ -18,7 +17,9 @@ router.use(authenticate);
 router.post(
   "/generate",
   [
+    body("documentId").optional().isMongoId().withMessage("Invalid documentId."),
     body("text")
+      .if((value, { req }) => !req.body.documentId)
       .isString()
       .isLength({ min: 100 })
       .withMessage("Provide at least 100 characters of study material."),

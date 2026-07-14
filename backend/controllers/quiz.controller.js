@@ -1,8 +1,6 @@
-
-import mongoose from "mongoose";
+﻿import mongoose from "mongoose";
 import { Quiz, QuizAttempt, Analytics } from "../models/Study.models.js";
 import { groqJSON, assembleContext } from "../utils/index.js";
-
 
 function buildQuizSystemPrompt(difficulty) {
   const depthGuide = {
@@ -39,7 +37,6 @@ QUALITY RULES:
 `.trim();
 }
 
-
 export const generateQuiz = async (req, res, next) => {
   try {
     const { documentId, difficulty = "medium" } = req.body;
@@ -50,7 +47,6 @@ export const generateQuiz = async (req, res, next) => {
     if (!["easy", "medium", "hard"].includes(difficulty)) {
       return res.status(400).json({ error: "difficulty must be easy | medium | hard." });
     }
-
 
     const DocumentChunk = mongoose.model("DocumentChunk");
 
@@ -85,7 +81,6 @@ export const generateQuiz = async (req, res, next) => {
       console.warn("[quiz.generate] Atlas $search unavailable, falling back to find():", searchErr.message);
     }
 
-
     const effectiveChunks = chunks.length
       ? chunks
       : await DocumentChunk.find({ documentId })
@@ -97,14 +92,12 @@ export const generateQuiz = async (req, res, next) => {
       return res.status(404).json({ error: "No content found for this document. Please re-upload." });
     }
 
-
     const parsed = await groqJSON({
       systemPrompt: buildQuizSystemPrompt(difficulty),
       userPrompt: `DOCUMENT CONTEXT:\n${assembleContext(effectiveChunks)}\n\nGenerate 5 ${difficulty}-level MCQs strictly from the content above.`,
       temperature: 0.4,
       maxTokens: 2500,
     });
-
 
     const valid =
       Array.isArray(parsed?.questions) &&
@@ -120,10 +113,8 @@ export const generateQuiz = async (req, res, next) => {
       return res.status(502).json({ error: "AI returned an invalid quiz structure. Please retry." });
     }
 
-
     const Document = mongoose.model("Document");
     const doc = await Document.findById(documentId).select("title subject").lean();
-
 
     const quiz = await Quiz.create({
       owner: req.user._id,
@@ -141,8 +132,6 @@ export const generateQuiz = async (req, res, next) => {
       })),
     });
 
-
-
     const plainQuiz = quiz.toObject();
     return res.status(201).json({
       success: true,
@@ -152,14 +141,13 @@ export const generateQuiz = async (req, res, next) => {
       questions: plainQuiz.questions.map(({ correctAnswer: _ca, explanation: _ex, ...safe }) => ({
         ...safe,
         _id: safe._id?.toString(),
-        options: safe.options.map(({ _id: oId, ...opt }) => opt), // strip option _ids
+        options: safe.options.map(({ _id: oId, ...opt }) => opt),
       })),
     });
   } catch (err) {
     next(err);
   }
 };
-
 
 export const submitAttempt = async (req, res, next) => {
   try {
@@ -172,7 +160,6 @@ export const submitAttempt = async (req, res, next) => {
 
     const quiz = await Quiz.findById(quizId).lean();
     if (!quiz) return res.status(404).json({ error: "Quiz not found." });
-
 
     const scoredAnswers = quiz.questions.map((q) => {
       const submission = answers?.find((a) => a.questionId === q._id.toString());
@@ -200,7 +187,6 @@ export const submitAttempt = async (req, res, next) => {
       startedAt: new Date(startedAt),
     });
 
-
     Analytics.recordAttempt({
       studentId: req.user._id,
       subject: quiz.subject,
@@ -227,7 +213,6 @@ export const submitAttempt = async (req, res, next) => {
   }
 };
 
-
 export const listQuizzes = async (req, res, next) => {
   try {
     const quizzes = await Quiz.find({ owner: req.user._id, isPublished: true })
@@ -241,7 +226,6 @@ export const listQuizzes = async (req, res, next) => {
     next(err);
   }
 };
-
 
 export const getQuizById = async (req, res, next) => {
   try {

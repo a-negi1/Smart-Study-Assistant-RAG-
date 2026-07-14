@@ -1,14 +1,11 @@
-
-
-import { createContext, useContext, useEffect, useReducer, useCallback } from "react";
+﻿import { createContext, useContext, useEffect, useReducer, useCallback } from "react";
 import { authAPI } from "../api/services.js";
 import toast from "react-hot-toast";
-
 
 const initialState = {
   user:            null,
   isAuthenticated: false,
-  isLoading:       true,   
+  isLoading:       true,
 };
 
 function authReducer(state, action) {
@@ -24,13 +21,12 @@ function authReducer(state, action) {
   }
 }
 
-
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  
+
   useEffect(() => {
     const verifySession = async () => {
       const token = localStorage.getItem("accessToken");
@@ -42,7 +38,6 @@ export function AuthProvider({ children }) {
         const { user } = await authAPI.getMe();
         dispatch({ type: "SET_USER", payload: user });
       } catch {
-        
         try {
           const { accessToken } = await authAPI.refresh();
           localStorage.setItem("accessToken", accessToken);
@@ -57,7 +52,6 @@ export function AuthProvider({ children }) {
     verifySession();
   }, []);
 
- 
   const register = useCallback(async (credentials) => {
     dispatch({ type: "SET_LOADING", payload: true });
     try {
@@ -74,7 +68,6 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  
   const login = useCallback(async (credentials) => {
     dispatch({ type: "SET_LOADING", payload: true });
     try {
@@ -92,27 +85,41 @@ export function AuthProvider({ children }) {
   }, []);
 
 
+  const loginWithGoogle = useCallback(async (credential) => {
+    dispatch({ type: "SET_LOADING", payload: true });
+    try {
+      const { user, accessToken } = await authAPI.googleAuth(credential);
+      localStorage.setItem("accessToken", accessToken);
+      dispatch({ type: "SET_USER", payload: user });
+      toast.success(`Welcome, ${user.name}! 🎉`);
+      return { success: true };
+    } catch (err) {
+      const msg = err.response?.data?.error ?? "Google sign-in failed.";
+      toast.error(msg);
+      dispatch({ type: "SET_LOADING", payload: false });
+      return { success: false, error: msg };
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await authAPI.logout();
-    } catch { /* ignore */ }
+    } catch {  }
     localStorage.removeItem("accessToken");
     dispatch({ type: "CLEAR_USER" });
     toast.success("Logged out successfully.");
   }, []);
 
-  
   const updateUser = useCallback((updatedUser) => {
     dispatch({ type: "SET_USER", payload: updatedUser });
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ ...state, login, loginWithGoogle, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
 }
-
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);

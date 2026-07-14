@@ -1,27 +1,23 @@
-
-
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
 
 import mammoth from "mammoth";
 import { createWorker } from "tesseract.js";
-
-const MIN_TEXT_LENGTH_BEFORE_OCR = 50;
-const MAX_OCR_PAGES = 15;
-const OCR_RENDER_SCALE = 2;
+import mupdf from "mupdf";
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const IMAGE_MIMES = ["image/png", "image/jpeg", "image/webp"];
 const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp"];
-
+const MAX_OCR_PAGES = 15;
+const OCR_RENDER_SCALE = 2;
+const MIN_TEXT_LENGTH_BEFORE_OCR = 50;
 
 let workerPromise = null;
 function getOcrWorker() {
   if (!workerPromise) workerPromise = createWorker("eng");
   return workerPromise;
 }
-
 
 export function detectFileKind(mimetype, originalname) {
   const ext = (originalname.split(".").pop() || "").toLowerCase();
@@ -31,49 +27,42 @@ export function detectFileKind(mimetype, originalname) {
   return "text";
 }
 
-
 async function ocrPdfPages(buffer) {
-  const [{ createCanvas }, pdfjsLib] = await Promise.all([
-    import("@napi-rs/canvas"),
-    import("pdfjs-dist/legacy/build/pdf.mjs"),
-  ]);
-
-  const worker = await getOcrWorker();
-  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
-  const pageCount = Math.min(pdf.numPages, MAX_OCR_PAGES);
+  const ocrWorker = await getOcrWorker();
+  const doc = mupdf.Document.openDocument(new Uint8Array(buffer), "application/pdf");
+  const pageCount = Math.min(doc.countPages(), MAX_OCR_PAGES);
+  const scale = mupdf.Matrix.scale(OCR_RENDER_SCALE, OCR_RENDER_SCALE);
 
   let combined = "";
-  for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
-    const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: OCR_RENDER_SCALE });
-    const canvas = createCanvas(viewport.width, viewport.height);
-
-    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-
-    const { data } = await worker.recognize(canvas.toBuffer("image/png"));
+  for (let i = 0; i < pageCount; i++) {
+    const page = doc.loadPage(i);
+    const pixmap = page.toPixmap(scale, mupdf.ColorSpace.DeviceRGB, false, true);
+    const pngBuffer = Buffer.from(pixmap.asPNG());
+    const { data } = await ocrWorker.recognize(pngBuffer);
     combined += `${data.text ?? ""}\n\n`;
   }
 
   return combined.trim();
 }
 
+async function parsePdfText(buffer) {
+  try {
+    const data = await pdfParse(buffer);
+    return (data.text ?? "").replace(/--\s*\d+\s+of\s+\d+\s*--/g, "").trim();
+  } catch {
+    return "";
+  }
+}
 
 export async function extractText(buffer, mimetype, originalname) {
   const kind = detectFileKind(mimetype, originalname);
 
   if (kind === "pdf") {
-    let text = "";
-    try {
-      const data = await pdfParse(buffer);
-      text = (data.text ?? "").trim();
-    } catch {
-      text = "";
-    }
+    let text = await parsePdfText(buffer);
 
     if (text.length >= MIN_TEXT_LENGTH_BEFORE_OCR) {
       return { text, method: "text", kind };
     }
-
 
     try {
       const ocrText = await ocrPdfPages(buffer);
@@ -81,7 +70,7 @@ export async function extractText(buffer, mimetype, originalname) {
         return { text: ocrText, method: "ocr", kind };
       }
     } catch (ocrErr) {
-      console.error("[textExtraction] PDF OCR fallback unavailable/failed:", ocrErr.message);
+      console.error("[textExtraction] PDF OCR fallback failed:", ocrErr.message);
     }
 
     return { text, method: "text", kind };
@@ -108,10 +97,8 @@ export async function extractText(buffer, mimetype, originalname) {
     }
   }
 
-
   return { text: buffer.toString("utf-8"), method: "text", kind };
 }
-
 
 export async function shutdownOcrWorker() {
   if (workerPromise) {

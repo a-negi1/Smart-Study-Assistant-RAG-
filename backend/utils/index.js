@@ -1,4 +1,4 @@
-﻿import Groq from "groq-sdk";
+import Groq from "groq-sdk";
 
 const groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -108,8 +108,9 @@ export async function generateEmbedding(text) {
     return [];
   }
 
-  const MAX_RETRIES = 4;
+  const MAX_RETRIES = 3;
   const truncated   = text.slice(0, 512);
+  const NETWORK_ERRORS = ["ENOTFOUND", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT"];
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -126,8 +127,7 @@ export async function generateEmbedding(text) {
       });
 
       if (res.status === 503) {
-
-        const wait = Math.min(2000 * 2 ** (attempt - 1), 30000);
+        const wait = Math.min(2000 * 2 ** (attempt - 1), 15000);
         console.log(`[embedding] Model loading (attempt ${attempt}/${MAX_RETRIES}), retrying in ${wait}ms…`);
         await new Promise((r) => setTimeout(r, wait));
         continue;
@@ -140,7 +140,6 @@ export async function generateEmbedding(text) {
 
       const data = await res.json();
 
-
       const vec = Array.isArray(data[0]) ? data[0] : data;
 
       if (!Array.isArray(vec) || vec.length !== 384) {
@@ -149,6 +148,12 @@ export async function generateEmbedding(text) {
 
       return vec;
     } catch (err) {
+      const causeCode = err.cause?.code || "";
+      if (NETWORK_ERRORS.includes(causeCode)) {
+        console.error(`[embedding] Network unreachable (${causeCode}) — skipping embeddings.`);
+        return [];
+      }
+
       if (attempt === MAX_RETRIES) {
         console.error(`[embedding] Failed after ${MAX_RETRIES} attempts:`, err.message);
         return [];

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 
@@ -28,10 +28,10 @@ function MailIcon() {
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-      <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-      <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
-      <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-      <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+      <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4" />
+      <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853" />
+      <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05" />
+      <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335" />
     </svg>
   );
 }
@@ -43,8 +43,8 @@ export default function LoginForm() {
   const redirectTo = location.state?.from?.pathname ?? "/dashboard";
   const googleBtnRef = useRef(null);
 
-  const [form, setForm]         = useState({ email: "", password: "" });
-  const [errors, setErrors]     = useState({});
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -78,8 +78,8 @@ export default function LoginForm() {
 
   const validate = () => {
     const e = {};
-    if (!/^\S+@\S+\.\S+$/.test(form.email)) e.email    = "Enter a valid email address.";
-    if (!form.password)                      e.password = "Password is required.";
+    if (!/^\S+@\S+\.\S+$/.test(form.email)) e.email = "Enter a valid email address.";
+    if (!form.password) e.password = "Password is required.";
     return e;
   };
 
@@ -101,11 +101,11 @@ export default function LoginForm() {
   return (
     <div className="auth-bg min-h-screen flex flex-col items-center justify-center p-4">
 
-      {}
+      { }
       <div className="w-full max-w-[400px] animate-fadeInScale relative z-10">
         <div className="auth-card px-8 pt-8 pb-7">
 
-          {}
+          { }
           <div className="flex flex-col items-center mb-8">
             <p
               className="text-2xl font-semibold tracking-tight mb-1"
@@ -118,10 +118,10 @@ export default function LoginForm() {
             </p>
           </div>
 
-          {}
+          { }
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
 
-            {}
+            { }
             <div>
               <label
                 className="block text-xs font-semibold mb-1.5 uppercase tracking-widest font-mono"
@@ -151,7 +151,7 @@ export default function LoginForm() {
               )}
             </div>
 
-            {}
+            { }
             <div>
               <label
                 className="block text-xs font-semibold mb-1.5 uppercase tracking-widest font-mono"
@@ -188,7 +188,7 @@ export default function LoginForm() {
               )}
             </div>
 
-            {}
+            { }
             <button
               id="login-submit"
               type="submit"
@@ -206,14 +206,14 @@ export default function LoginForm() {
             </button>
           </form>
 
-          {}
+          { }
           <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px" style={{ background: "var(--rule)" }} />
             <span className="text-xs font-mono" style={{ color: "var(--text-3)" }}>or</span>
             <div className="flex-1 h-px" style={{ background: "var(--rule)" }} />
           </div>
 
-          {}
+          { }
           {GOOGLE_CLIENT_ID ? (
             <div className="w-full overflow-hidden rounded-xl" ref={googleBtnRef} />
           ) : (
@@ -236,7 +236,7 @@ export default function LoginForm() {
             </button>
           )}
 
-          {}
+          { }
           <p className="text-center text-sm mt-5" style={{ color: "var(--text-3)" }}>
             No account?{" "}
             <Link
@@ -249,7 +249,7 @@ export default function LoginForm() {
           </p>
         </div>
 
-        {}
+        { }
         <div className="watermark mt-4">
           <span>© {new Date().getFullYear()}</span>
           <span style={{ width: 2, height: 2, borderRadius: "50%", background: "var(--text-3)", display: "inline-block", opacity: 0.5 }} />
